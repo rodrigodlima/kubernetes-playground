@@ -1,2 +1,2 @@
-# kuebernetes-playground
+# kubernetes-playground
 Kubernetes POCs
