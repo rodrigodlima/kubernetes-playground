@@ -1,0 +1,12 @@
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.jmod
+target/
+
+# Metals (Scala/Java LSP)
+.metals/
+.bloop/
+metals.sbt
