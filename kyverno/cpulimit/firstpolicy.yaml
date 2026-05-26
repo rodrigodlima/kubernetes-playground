@@ -1,0 +1,21 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: cpu-limits
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - name: validate-cpu-limits
+    match:
+      resources:
+        kinds:
+        - Pod
+    validate:
+      message: "The cpu limit are not defined"
+      pattern:
+        spec:
+          containers:
+          - name: "*"
+            resources:
+              limits:
+                cpu: "?*"
