@@ -67,3 +67,33 @@ kubectl run nginx --image=nginx --labels="app=nginx,version=v1"
 | File | Description |
 |------|-------------|
 | `requiteLabels/require-labels.yaml` | ValidatingPolicy that requires `app` and `version` labels on Pods |
+
+---
+
+## 3. Enforce Non-Root Containers (`enforceNonRootContainer/`)
+
+A `ClusterPolicy` that prevents containers from running as root. Uses `Enforce` mode, so Pods without `runAsNonRoot: true` in their security context are **rejected** at admission time.
+
+If a Pod is missing the required security context, the following message is returned:
+
+> "Running as root is not allowed. Set runAsNonRoot to true."
+
+### How to test
+
+```bash
+# Apply the policy
+kubectl apply -f enforceNonRootContainer/enforce-nonroot.yaml
+
+# Blocked - no runAsNonRoot set
+kubectl apply -f enforceNonRootContainer/nginx-root.yaml
+
+# Allowed - runAsNonRoot set to true
+kubectl run nginx --image=nginx --overrides='{"spec":{"containers":[{"name":"nginx","image":"nginx","securityContext":{"runAsNonRoot":true}}]}}'
+```
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `enforceNonRootContainer/enforce-nonroot.yaml` | ClusterPolicy that enforces `runAsNonRoot: true` on all Pod containers |
+| `enforceNonRootContainer/nginx-root.yaml` | Example Pod **without** `runAsNonRoot` (blocked) |
