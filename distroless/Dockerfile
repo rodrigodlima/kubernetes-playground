@@ -1,20 +1,9 @@
-# STAGE 1: Build
-FROM maven:3.9.6-eclipse-temurin-17 AS build
+FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
+COPY Hello.java .
+RUN javac Hello.java && \
+    jar --create --file hello.jar --main-class Hello Hello.class
 
-COPY HelloWorld.java .
-RUN javac HelloWorld.java && jar cf app.jar HelloWorld.class
-
-
-# STAGE 2: Runtime
-FROM eclipse-temurin:17-jre-alpine
-WORKDIR /app
-
-# Copy only the compiled JAR from the build stage
-COPY --from=build /app/*.jar app.jar
-
-# Expose the application port (standard for Spring Boot)
-EXPOSE 8080
-
-# Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+FROM gcr.io/distroless/java25-debian12
+COPY --from=build /app/hello.jar /hello.jar
+CMD ["/hello.jar"]
