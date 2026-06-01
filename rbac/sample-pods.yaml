@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-a
+  namespace: rbac-demo
+  labels:
+    app: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:alpine
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-b
+  namespace: rbac-demo
+  labels:
+    app: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:alpine
