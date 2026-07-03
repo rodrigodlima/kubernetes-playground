@@ -7,6 +7,7 @@ ingressRoute:
     enabled: false
 
 service:
-  annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  enabled: true
+  spec:
+    type: NodePort
 
