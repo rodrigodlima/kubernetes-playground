@@ -1,7 +1,6 @@
 ingressClass:
   enabled: true
   isDefaultClass: true
-  fallbackApiVersion: v1
 
 ingressRoute:
   dashboard:
@@ -10,5 +9,4 @@ ingressRoute:
 service:
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: nlb
-globalArguments:
-- "--api.insecure=true"
+
