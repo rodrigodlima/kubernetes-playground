@@ -1,0 +1,37 @@
+# Example workflow (copy to .github/workflows/polaris.yaml in the application repo)
+name: polaris
+
+on:
+  pull_request:
+    paths:
+      - "k8s/**"
+      - "charts/**"
+      - "polaris-config.yaml"
+
+jobs:
+  polaris:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Plain manifests / already-rendered Kustomize output
+      - name: Polaris audit (manifests)
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo quay.io/fairwinds/polaris:10.1 \
+            polaris audit \
+              --config polaris-config.yaml \
+              --audit-path k8s/ \
+              --format pretty --color=false \
+              --set-exit-code-on-danger \
+              --set-exit-code-below-score 80
+
+      # Helm chart: Polaris renders the template before auditing
+      - name: Polaris audit (helm)
+        run: |
+          docker run --rm -v "$PWD:/repo:ro" -w /repo quay.io/fairwinds/polaris:10.1 \
+            polaris audit \
+              --config polaris-config.yaml \
+              --helm-chart charts/api \
+              --helm-values charts/api/values-prod.yaml \
+              --format pretty --color=false \
+              --set-exit-code-on-danger
