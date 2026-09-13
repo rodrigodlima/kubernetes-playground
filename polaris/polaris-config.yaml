@@ -1,0 +1,64 @@
+# Custom Polaris config for the demo
+# Usage: polaris audit --config polaris-config.yaml --audit-path examples/
+checks:
+  # Security: blocks the PR (exit code 3 with --set-exit-code-on-danger)
+  hostNetworkSet: danger
+  hostPIDSet: danger
+  hostIPCSet: danger
+  runAsPrivileged: danger
+  runAsRootAllowed: danger
+  privilegeEscalationAllowed: danger
+  dangerousCapabilities: danger
+  tagNotSpecified: danger
+  # Efficiency: requests are mandatory, limits are only a warning
+  cpuRequestsMissing: danger
+  memoryRequestsMissing: danger
+  cpuLimitsMissing: warning
+  memoryLimitsMissing: warning
+  # Reliability
+  readinessProbeMissing: warning
+  livenessProbeMissing: warning
+  deploymentMissingReplicas: warning
+  pullPolicyNotAlways: ignore
+  # Custom checks (below)
+  imageRegistry: danger
+  teamLabelMissing: warning
+
+customChecks:
+  imageRegistry:
+    successMessage: Image comes from an approved registry
+    failureMessage: Image must come from ghcr.io/my-org or registry.k8s.io
+    category: Security
+    target: Container
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      properties:
+        image:
+          type: string
+          anyOf:
+            - pattern: ^ghcr.io/my-org/.+$
+            - pattern: ^registry.k8s.io/.+$
+  teamLabelMissing:
+    successMessage: Label "team" is set
+    failureMessage: Workloads must have the "team" label (ownership / on-call)
+    category: Reliability
+    target: Controller
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      required: ["metadata"]
+      properties:
+        metadata:
+          type: object
+          required: ["labels"]
+          properties:
+            labels:
+              type: object
+              required: ["team"]
+
+exemptions:
+  # System components that legitimately need hostNetwork
+  - namespace: kube-system
+    controllerNames: ["kube-proxy", "cilium"]
+    rules: ["hostNetworkSet", "runAsPrivileged"]
