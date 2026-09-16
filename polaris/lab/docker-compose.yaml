@@ -1,0 +1,23 @@
+services:
+  jenkins:
+    build: ./jenkins
+    image: polaris-lab-jenkins:local
+    container_name: polaris-lab-jenkins
+    ports:
+      - "8080:8080"
+    environment:
+      KUBECONFIG: /kube/config
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./.work/demo-app:/demo-app:ro
+      - ./.work/kubeconfig:/kube/config:ro
+    networks:
+      - polaris-lab
+
+volumes:
+  jenkins_home:
+
+networks:
+  # Docker network created by "minikube start -p polaris-lab --driver=docker"
+  polaris-lab:
+    external: true
