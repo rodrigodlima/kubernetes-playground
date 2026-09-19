@@ -1,0 +1,35 @@
+jenkins:
+  systemMessage: "Polaris lab - local demo only"
+  numExecutors: 2
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: admin
+          password: admin
+  authorizationStrategy: loggedInUsersCanDoAnything
+
+unclassified:
+  location:
+    url: http://localhost:8080/
+
+jobs:
+  - script: |
+      pipelineJob('polaris-demo') {
+        description('Simulates a PR pipeline: Polaris audit, then deploy to minikube')
+        parameters {
+          choiceParam('BRANCH', ['main', 'feature/insecure', 'feature/untrusted-registry'], 'Branch (simulated PR) to build')
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('file:///demo-app') }
+                branch('^${BRANCH}')  // ^ escapes JCasC variable substitution
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(false)
+          }
+        }
+      }
