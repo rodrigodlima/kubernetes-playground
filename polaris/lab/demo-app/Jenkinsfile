@@ -1,0 +1,37 @@
+// Simulated PR pipeline: audit the manifests with Polaris, deploy only if they pass.
+pipeline {
+  agent any
+  options { timestamps() }
+  environment {
+    NAMESPACE = 'demo'
+  }
+  stages {
+    stage('Polaris audit') {
+      steps {
+        // Full JSON report, kept as a build artifact
+        sh 'polaris audit --config polaris-config.yaml --audit-path k8s/ --format json > polaris-report.json'
+        // Readable output + quality gate:
+        //   exit 3 = at least one "danger" finding, exit 4 = score below 80
+        sh '''
+          polaris audit --config polaris-config.yaml --audit-path k8s/ \
+            --format pretty --color=false --only-show-failed-tests \
+            --set-exit-code-on-danger \
+            --set-exit-code-below-score 80
+        '''
+      }
+      post {
+        always { archiveArtifacts artifacts: 'polaris-report.json', allowEmptyArchive: true }
+      }
+    }
+    stage('Deploy to minikube') {
+      steps {
+        sh 'kubectl apply -n "$NAMESPACE" -f k8s/'
+        sh 'kubectl rollout status deployment/api -n "$NAMESPACE" --timeout=180s'
+      }
+    }
+  }
+  post {
+    failure { echo 'Pipeline blocked: fix the Polaris findings above before merging.' }
+    success { echo 'Manifests passed Polaris and were deployed.' }
+  }
+}
