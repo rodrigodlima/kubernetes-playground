@@ -1,0 +1,61 @@
+# Polaris config used by the demo pipeline
+checks:
+  # Security: blocks the pipeline
+  hostNetworkSet: danger
+  hostPIDSet: danger
+  hostIPCSet: danger
+  runAsPrivileged: danger
+  runAsRootAllowed: danger
+  privilegeEscalationAllowed: danger
+  dangerousCapabilities: danger
+  insecureCapabilities: warning
+  notReadOnlyRootFilesystem: warning
+  # Reliability
+  tagNotSpecified: danger
+  readinessProbeMissing: warning
+  livenessProbeMissing: warning
+  deploymentMissingReplicas: warning
+  missingPodDisruptionBudget: warning
+  pullPolicyNotAlways: ignore
+  # Efficiency
+  cpuRequestsMissing: danger
+  memoryRequestsMissing: danger
+  cpuLimitsMissing: warning
+  memoryLimitsMissing: warning
+  # Company rules (custom checks below)
+  imageRegistry: danger
+  teamLabelMissing: warning
+
+customChecks:
+  imageRegistry:
+    successMessage: Image comes from an approved registry
+    failureMessage: Image must come from an approved registry (ghcr.io/my-org, registry.k8s.io or nginxinc)
+    category: Security
+    target: Container
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      properties:
+        image:
+          type: string
+          anyOf:
+            - pattern: ^ghcr.io/my-org/.+$
+            - pattern: ^registry.k8s.io/.+$
+            - pattern: ^nginxinc/.+$
+  teamLabelMissing:
+    successMessage: Label "team" is set
+    failureMessage: Workloads must have the "team" label (ownership / on-call)
+    category: Reliability
+    target: Controller
+    schema:
+      '$schema': http://json-schema.org/draft-07/schema
+      type: object
+      required: ["metadata"]
+      properties:
+        metadata:
+          type: object
+          required: ["labels"]
+          properties:
+            labels:
+              type: object
+              required: ["team"]
