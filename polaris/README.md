@@ -26,7 +26,15 @@ docker run --rm -v "$PWD:/w:ro" -w /w quay.io/fairwinds/polaris:10.1 \
 | `examples/bad/deployment.yaml` | Deployment with security/reliability problems |
 | `examples/good/deployment.yaml` | Fixed Deployment + PodDisruptionBudget + NetworkPolicy |
 | `polaris-config.yaml` | Custom severities, custom checks (`imageRegistry`, `teamLabelMissing`) and exemptions |
-| `ci/github-actions-polaris.yaml` | GitHub Actions workflow that fails the PR on `danger` items or low score |
+| `lab/` | Hands-on lab: minikube + Jenkins pipeline that blocks bad manifests (see `lab/README.md`) |
+
+## Hands-on lab
+
+```bash
+cd lab && ./setup.sh
+```
+
+See [`lab/README.md`](lab/README.md) for the demo script.
 
 ## Presenting
 
