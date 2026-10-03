@@ -141,18 +141,24 @@ metadata:
 
 ## 9. In the pipeline (0:45)
 
-**Show:** GitHub Actions workflow, exit codes 3 and 4
+**Show:** Jenkinsfile, exit codes 3 and 4
 
 **Say:**
 
-> Now let's put Polaris in the pipeline.
+> Now let's put Polaris in the pipeline. We use Jenkins.
 > With these two flags, Polaris returns an exit code.
 > Exit code 3 means a danger problem. Exit code 4 means the score is too low.
-> Make the job a required check, and nobody can merge the PR.
+> When the exit code is not zero, Jenkins stops. There is no deploy.
 > My tip: start with warnings and a low score. Then go up a little every sprint.
 
 | Flag | Exit code |
 |------|-----------|
+| `--set-exit-code-on-danger` | 3 |
+| `--set-exit-code-below-score N` | 4 |
+
+File in the repo: `lab/demo-app/Jenkinsfile`
+
+------|-----------|
 | `--set-exit-code-on-danger` | 3 |
 | `--set-exit-code-below-score N` | 4 |
 
@@ -229,3 +235,30 @@ and `topologySpreadConstraint`. The webhook's `failurePolicy` decides what happe
 - https://www.cncf.io/blog/2021/07/01/what-is-fairwinds-polaris-kubernetes-open-source-configuration-validation/
 - https://kubernetes.io/docs/concepts/security/pod-security-admission/
 - https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/
+
+---
+
+## Live demo (optional, +3 min)
+
+Run `cd lab && ./setup.sh` **before** the talk. Open Jenkins at http://localhost:8080 (admin / admin).
+Do the demo after slide 9. Full steps: `lab/README.md`.
+
+1. **Build `main`**
+
+   > This is a good PR. Polaris gives 100. Jenkins deploys it. Look: 3 Pods are running.
+
+2. **Build `feature/insecure`**
+
+   > Now a bad PR. The score is 12. Exit code 3. Jenkins stops, and there is no deploy.
+
+3. **Build `feature/untrusted-registry`**
+
+   > This one has a score of 95. Very good, right? But the image comes from a registry we don't trust.
+   > One danger problem is enough. The PR is blocked.
+
+4. **Skip CI with `kubectl apply`**
+
+   > What if someone skips Jenkins? Pod Security Admission blocks the Pods in the cluster.
+   > But look: the Deployment was created, and the error is only in the events. It is late.
+   > This is why we use both: Polaris in the PR, and native tools in the cluster.
+
