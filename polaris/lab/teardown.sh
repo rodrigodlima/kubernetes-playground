@@ -3,6 +3,9 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-docker compose down -v --rmi local || true
+source ./engine.sh
+
+"${COMPOSE[@]}" down -v || true
+"$CONTAINER_ENGINE" rmi polaris-lab-jenkins:local 2> /dev/null || true
 minikube delete -p polaris-lab || true
 rm -rf .work

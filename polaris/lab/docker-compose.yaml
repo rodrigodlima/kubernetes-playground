@@ -9,8 +9,9 @@ services:
       KUBECONFIG: /kube/config
     volumes:
       - jenkins_home:/var/jenkins_home
-      - ./.work/demo-app:/demo-app:ro
-      - ./.work/kubeconfig:/kube/config:ro
+      # z: SELinux label for Podman on Fedora/RHEL; ignored where SELinux is off
+      - ./.work/demo-app:/demo-app:ro,z
+      - ./.work/kubeconfig:/kube/config:ro,z
     networks:
       - polaris-lab
 
@@ -18,6 +19,6 @@ volumes:
   jenkins_home:
 
 networks:
-  # Docker network created by "minikube start -p polaris-lab --driver=docker"
+  # Network created by "minikube start -p polaris-lab" (docker or podman driver)
   polaris-lab:
     external: true

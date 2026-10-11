@@ -3,12 +3,12 @@
 A local lab to show Polaris in a real pipeline:
 
 - **minikube** cluster (own profile `polaris-lab`, own kubeconfig - your `~/.kube/config` is not changed)
-- **Jenkins** in Docker, configured as code (JCasC), with `polaris` and `kubectl` installed
+- **Jenkins** in a container (Docker or Podman), configured as code (JCasC), with `polaris` and `kubectl` installed
 - A local **Git repo** with one branch per simulated PR
 - Namespace `demo` with **Pod Security Admission** `restricted` (the native layer)
 
 ```text
- demo-app (git)          Jenkins (Docker)                      minikube
+ demo-app (git)          Jenkins (container)                   minikube
 ┌────────────────┐     ┌─────────────────────────────┐     ┌──────────────────────┐
 │ main           │ ──► │ 1. Polaris audit            │     │ namespace demo       │
 │ feature/...    │     │    exit 3 / 4 → stop        │     │ PSA: restricted      │
@@ -18,8 +18,8 @@ A local lab to show Polaris in a real pipeline:
 
 ## Prerequisites
 
-- Docker (with Docker Compose)
-- minikube (tested with v1.35, docker driver)
+- Docker (with Docker Compose) **or** Podman (with `podman compose` or `podman-compose`)
+- minikube (tested with v1.35)
 - kubectl
 - About 4 GB RAM free and internet access (images are pulled on first run)
 
@@ -27,6 +27,12 @@ A local lab to show Polaris in a real pipeline:
 
 ```bash
 ./setup.sh
+```
+
+`setup.sh` uses Docker when it is installed, otherwise Podman. To choose:
+
+```bash
+CONTAINER_ENGINE=podman ./setup.sh     # same variable for ./teardown.sh
 ```
 
 It takes a few minutes the first time. At the end:
@@ -73,8 +79,9 @@ the Deployment is created and the error is only in the events. Polaris shows it 
 | File | Description |
 |------|-------------|
 | `setup.sh` / `teardown.sh` | Create / delete the whole lab |
+| `engine.sh` | Picks Docker or Podman (minikube driver + compose command) |
 | `trigger.sh` | Start a build for a branch, wait, print the console output |
-| `docker-compose.yaml` | Jenkins container, joined to the `polaris-lab` minikube network |
+| `docker-compose.yaml` | Jenkins container (Docker or Podman), joined to the `polaris-lab` minikube network |
 | `jenkins/Dockerfile` | Jenkins LTS + `polaris` (copied from the official image) + `kubectl` |
 | `jenkins/casc.yaml` | Jenkins config as code: admin user and the `polaris-demo` pipeline job |
 | `jenkins/plugins.txt` | Jenkins plugins |
@@ -93,6 +100,19 @@ To change a scenario, edit the files in `demo-app/` and run `./setup.sh` again.
 ```bash
 ./teardown.sh
 ```
+
+## Podman
+
+With Podman, `setup.sh` runs `minikube start --driver=podman --container-runtime=containerd`
+and starts Jenkins with `podman compose` (or `podman-compose`).
+
+- **Rootless Podman** (the default) is expected: minikube and Jenkins must be in the same
+  Podman, so Jenkins can join the `polaris-lab` network. `engine.sh` sets `MINIKUBE_ROOTLESS=true`.
+- Rootless minikube needs cgroup v2 with CPU delegation. If `minikube start` fails, see
+  <https://minikube.sigs.k8s.io/docs/drivers/podman/> and
+  <https://rootlesscontaine.rs/getting-started/common/cgroup2/>.
+- The `docker` command from the `podman-docker` package is detected as Podman.
+- If minikube still has an old profile from another driver: `minikube delete -p polaris-lab`.
 
 ## Notes
 

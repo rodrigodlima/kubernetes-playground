@@ -9,10 +9,11 @@ K8S_VERSION=v1.32.0
 WORK="$PWD/.work"
 export KUBECONFIG="$WORK/kubeconfig-host"
 
+source ./engine.sh
 mkdir -p "$WORK"
 
 echo ">> Starting minikube (profile: $PROFILE)"
-minikube start -p "$PROFILE" --driver=docker --kubernetes-version="$K8S_VERSION" --cpus=2 --memory=4096
+minikube start -p "$PROFILE" "${MINIKUBE_FLAGS[@]}" --kubernetes-version="$K8S_VERSION" --cpus=2 --memory=4096
 
 echo ">> Creating namespace (Pod Security Admission: restricted) and PriorityClass"
 kubectl apply -f cluster/
@@ -40,7 +41,7 @@ git_ checkout -q main
 chmod -R a+rX "$REPO"
 
 echo ">> Building and starting Jenkins"
-docker compose up -d --build
+"${COMPOSE[@]}" up -d --build
 
 echo ">> Waiting for Jenkins at http://localhost:8080"
 until curl -fs -o /dev/null -u admin:admin http://localhost:8080/job/polaris-demo/api/json; do sleep 5; done
