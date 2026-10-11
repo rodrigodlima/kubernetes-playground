@@ -22,16 +22,12 @@ docker run --rm -v "$PWD:/w:ro" -w /w quay.io/fairwinds/polaris:10.1 \
 
 | File | Description |
 |------|-------------|
-| `presentation.md` | Slides (Marp format, ~9 min) with speaker notes |
+| `presentation.md` | Speaker guide in simple English: what to show and say on each slide (~9 min) |
 | `examples/bad/deployment.yaml` | Deployment with security/reliability problems |
 | `examples/good/deployment.yaml` | Fixed Deployment + PodDisruptionBudget + NetworkPolicy |
 | `polaris-config.yaml` | Custom severities, custom checks (`imageRegistry`, `teamLabelMissing`) and exemptions |
 | `ci/github-actions-polaris.yaml` | GitHub Actions workflow that fails the PR on `danger` items or low score |
 
-## Presenting the slides
+## Presenting
 
-```bash
-npx @marp-team/marp-cli presentation.md --html -o presentation.html   # or --pdf / --pptx
-```
-
-Or use the "Marp for VS Code" extension to preview.
+The audience slides are a separate Slides artifact. `presentation.md` is the speaker guide: for each slide it shows what is on the screen, a short script to say, and the time.

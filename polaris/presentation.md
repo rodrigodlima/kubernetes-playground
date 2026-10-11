@@ -5,188 +5,125 @@ paginate: true
 title: Polaris - Kubernetes Configuration Validation
 ---
 
-<!-- _class: lead -->
+# Speaker guide: Polaris
 
-# Polaris 🧭
+Total time: about 9 and a half minutes (13 slides).
 
-### Validating Kubernetes configuration *before* the merge
+Each slide below has:
 
-Rodrigo de Lima Silva
+- **Show:** what is on the screen
+- **Say:** a simple script you can read
+- **Time:** how long to stay on the slide
 
-<!--
-Target total time: ~9min30 (13 slides). (0:20)
-Open with a question: "how many of you have approved a PR with a YAML that 'worked'?"
--->
-
----
-
-## The problem: "it works" ≠ "it's good"
-
-```yaml
-containers:
-  - name: api
-    image: nginx:latest          # which version will run tomorrow?
-    securityContext:
-      privileged: true           # root on the node
-```
-
-- `kubectl apply` accepts it. The Pod starts. Human review doesn't catch everything.
-- The problems show up later: **security incident**, **OOMKill**, **noisy neighbor**, **deploy without probes dropping traffic**.
-- The later a mistake is found, the more expensive it is → **shift-left**.
-
-<!--
-(0:45) Emphasis: the API server only validates SCHEMA, not best practices.
--->
+The slides for the audience are in the Slides artifact. The same script is in the speaker notes there.
 
 ---
 
-## What is Polaris
+## 1. Cover (0:20)
 
-Open source tool by **Fairwinds** that audits Kubernetes workloads against best practices.
+**Show:** "Find bad Kubernetes YAML before the merge"
 
-| Mode | Where it runs | What for |
-|------|---------------|----------|
-| **CLI** (`polaris audit`) | CI/CD, local machine | Validate YAML / Helm **before** deploy |
-| **Admission Controller** (`webhook`) | Inside the cluster | Block what didn't go through the pipeline |
-| **Dashboard** | Inside the cluster | View of what is **already** running |
+**Say:**
 
-- ~30 built-in checks, zero configuration to get started
-- Same config file across all 3 modes
-- Bonus: `polaris fix` automatically fixes some issues
-
-<!--
-(0:45) It is part of the CNCF Landscape and has a post on the CNCF blog,
-but it is maintained by Fairwinds (not a CNCF hosted/incubating project).
-Today's focus is the CLI mode.
--->
+> Hello! Today I will talk about Polaris. Polaris checks Kubernetes YAML files.
+> First, a question: who here approved a PR with a YAML file that worked, but was not good?
 
 ---
 
-## How checks are organized
+## 2. The problem (0:45)
 
-**3 categories**
+**Show:** YAML with `image: nginx:latest` and `privileged: true`
 
-- 🔒 **Security** — `runAsPrivileged`, `runAsRootAllowed`, `hostNetworkSet`, `dangerousCapabilities`, `privilegeEscalationAllowed`, `notReadOnlyRootFilesystem`
-- ⚡ **Efficiency** — `cpuRequestsMissing`, `memoryLimitsMissing`, …
-- 🛟 **Reliability** — `readinessProbeMissing`, `livenessProbeMissing`, `tagNotSpecified`, `deploymentMissingReplicas`, `missingPodDisruptionBudget`
+**Say:**
 
-**3 severities** — `ignore` · `warning` 😬 · `danger` ❌
-
-**Score from 0 to 100** → enables gradual adoption (e.g. "no repo below 80")
-
-<!--
-(0:45) The score is the differentiator for teams with legacy: no need to fix everything on day 1.
--->
+> Look at this YAML. kubectl says yes. The Pod starts.
+> But the image tag is `latest`, and the container runs as root.
+> The API server only checks the format. It does not check good practices.
+> Later, we see the problems: security problems, Pods killed because of memory, lost traffic.
+> A late problem is an expensive problem. So we want to find it early, in the PR.
 
 ---
 
-## Example 1 — a "first commit" Deployment
+## 3. What is Polaris (0:45)
 
-```yaml
-spec:
-  replicas: 1
-  template:
-    spec:
-      hostNetwork: true
-      containers:
-        - name: api
-          image: nginx:latest
-          securityContext:
-            privileged: true
-            allowPrivilegeEscalation: true
-            capabilities:
-              add: ["NET_ADMIN", "SYS_ADMIN"]
-```
+**Show:** three cards: CLI, Admission webhook, Dashboard
+
+**Say:**
+
+> Polaris is an open source tool from Fairwinds.
+> It is in the CNCF Landscape, but it is not a CNCF project.
+> You can use it in three ways: in CI, as a webhook in the cluster, or as a dashboard.
+> You use the same config file for all three. Today I will talk about the CLI.
+
+**If someone asks:** `polaris fix` can fix some problems in the YAML for you.
+
+---
+
+## 4. How checks are organized (0:45)
+
+**Show:** Security, Efficiency, Reliability · ignore, warning, danger · score 0–100
+
+**Say:**
+
+> Polaris has three groups of checks: security, efficiency and reliability.
+> Each check has a level: ignore, warning or danger.
+> Polaris also gives you a score, from 0 to 100.
+> This is great for old projects. You don't need to fix everything on day one.
+
+---
+
+## 5. Example 1: a "first commit" Deployment (0:30)
+
+**Show:** `examples/bad/deployment.yaml`
+
+**Say:**
+
+> This is a normal Deployment. Maybe it is your first commit.
+> Look at it for a few seconds. How many problems can you see?
+> Let's ask Polaris.
+
+**Command:**
 
 ```bash
 polaris audit --audit-path examples/bad --format pretty --only-show-failed-tests
 ```
 
-<!--
-(0:30) Full file: examples/bad/deployment.yaml
--->
+---
+
+## 6. Example 1: the result (1:00)
+
+**Show:** score 35 → 100, table with the 6 danger checks
+
+**Say:**
+
+> This is the real output from Polaris. The score is 35.
+> There are 24 problems, and 6 are danger.
+> Kubernetes does not block any of them.
+> Then I fixed the file. I added securityContext, resources, probes, an image tag,
+> 3 replicas, a PDB and a NetworkPolicy. Now the score is 100.
+
+**The 6 danger checks:** `hostNetworkSet`, `runAsPrivileged`, `runAsRootAllowed`,
+`privilegeEscalationAllowed`, `dangerousCapabilities`, `tagNotSpecified`.
 
 ---
 
-## Example 1 — the result
+## 7. Example 2: your own rules (0:45)
 
-```text
-Polaris audited Path examples/bad
-    Nodes: 0 | Namespaces: 0 | Controllers: 1
-    Final score: 35
+**Show:** `imageRegistry` custom check in `polaris-config.yaml`
 
-Deployment api in namespace demo
-    hostNetworkSet               ❌ Danger   Security - Host network should not be configured
-    deploymentMissingReplicas    😬 Warning  Reliability - Only one replica is scheduled
-    missingPodDisruptionBudget   😬 Warning  Reliability - Should have a PodDisruptionBudget
-  Container api
-    runAsPrivileged              ❌ Danger   Security - Should not be running as privileged
-    runAsRootAllowed             ❌ Danger   Security - Should not be allowed to run as root
-    privilegeEscalationAllowed   ❌ Danger   Security - Privilege escalation should not be allowed
-    dangerousCapabilities        ❌ Danger   Security - Container should not have dangerous capabilities
-    tagNotSpecified              ❌ Danger   Reliability - Image tag should be specified
-    cpuRequestsMissing           😬 Warning  Efficiency - CPU requests should be set
-    memoryLimitsMissing          😬 Warning  Efficiency - Memory limits should be set
-    readinessProbeMissing        😬 Warning  Reliability - Readiness probe should be configured
-    ... (24 findings in total)
-```
+**Say:**
 
-**Score 35, 6 `danger` items.** Fixed (`examples/good/`) → **score 100**.
-
-<!--
-(1:00) Real output (Polaris 10.1). Highlight: ~15 lines of YAML, 24 findings, none of them
-would be blocked by the API server. The fixed version adds securityContext, resources,
-probes, pinned tag, 3 replicas, PDB and NetworkPolicy.
--->
+> You can also write your own rules, with JSON Schema.
+> In this example, images must come from our registry.
+> In the repo, I also have a rule for the team label.
+> The perfect file had 100. With our rules, it has 90.
+> Polaris does not know your company, so you add your rules.
 
 ---
 
-## Example 2 — *your* company's rules (custom checks)
+## 8. Example 3: exceptions (0:30)
 
-Custom checks are written in **JSON Schema**:
-
-```yaml
-checks:
-  imageRegistry: danger
-customChecks:
-  imageRegistry:
-    category: Security
-    target: Container
-    failureMessage: Image must come from ghcr.io/my-org or registry.k8s.io
-    schema:
-      '$schema': http://json-schema.org/draft-07/schema
-      type: object
-      properties:
-        image:
-          type: string
-          anyOf:
-            - pattern: ^ghcr.io/my-org/.+$
-            - pattern: ^registry.k8s.io/.+$
-```
-
-Other useful examples: required `team` label, forbid `NodePort`, require `resources` on `initContainers`, cap maximum `replicas`.
-
-<!--
-(0:45) In the repo, polaris-config.yaml has imageRegistry + teamLabelMissing.
-The "perfect" manifest (score 100) drops to 90 with company rules — the defaults don't know your context.
--->
-
----
-
-## Example 3 — explicit, auditable exemptions
-
-Not every rule applies to everything (e.g. CNI and kube-proxy **need** `hostNetwork`).
-
-**In the central config:**
-
-```yaml
-exemptions:
-  - namespace: kube-system
-    controllerNames: ["kube-proxy", "cilium"]
-    rules: ["hostNetworkSet", "runAsPrivileged"]
-```
-
-**In the manifest itself** (visible in the PR):
+**Show:** `exemptions` in the config, and the annotation in the YAML
 
 ```yaml
 metadata:
@@ -194,132 +131,101 @@ metadata:
     polaris.fairwinds.com/hostNetworkSet-exempt: "true"
 ```
 
-<!--
-(0:30) The exemption becomes something reviewable in code review, instead of "just turn off the check".
--->
+**Say:**
+
+> Some apps must break a rule. For example, kube-proxy and the CNI need hostNetwork.
+> You can add an exception in the config file, or in the YAML file with an annotation.
+> The good part: everyone can see the exception in the PR.
 
 ---
 
-## In the pipeline: blocking the PR
+## 9. In the pipeline (0:45)
 
-```yaml
-# .github/workflows/polaris.yaml
-on: pull_request
-jobs:
-  polaris:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: |
-          docker run --rm -v "$PWD:/repo:ro" -w /repo quay.io/fairwinds/polaris:10.1 \
-            polaris audit --config polaris-config.yaml --audit-path k8s/ \
-              --format pretty \
-              --set-exit-code-on-danger \
-              --set-exit-code-below-score 80
-```
+**Show:** GitHub Actions workflow, exit codes 3 and 4
+
+**Say:**
+
+> Now let's put Polaris in the pipeline.
+> With these two flags, Polaris returns an exit code.
+> Exit code 3 means a danger problem. Exit code 4 means the score is too low.
+> Make the job a required check, and nobody can merge the PR.
+> My tip: start with warnings and a low score. Then go up a little every sprint.
 
 | Flag | Exit code |
 |------|-----------|
-| `--set-exit-code-on-danger` | **3** if there is any `danger` |
-| `--set-exit-code-below-score N` | **4** if score < N |
+| `--set-exit-code-on-danger` | 3 |
+| `--set-exit-code-below-score N` | 4 |
 
-Helm: `--helm-chart charts/api --helm-values values-prod.yaml` renders and audits.
-
-<!--
-(0:45) Mark the job as a required check in branch protection → the PR can't be merged.
-Rollout strategy: start with warnings / low score threshold, raise it every sprint.
--->
+File in the repo: `ci/github-actions-polaris.yaml`
 
 ---
 
-## Polaris vs. native Kubernetes tools
+## 10. Polaris vs. native tools (1:15)
 
-| | Polaris (CLI) | Pod Security Admission | ValidatingAdmissionPolicy (CEL) | `kubectl --dry-run=server` / kubeconform |
-|---|---|---|---|---|
-| Where it validates | **CI, offline** | Cluster (admission) | Cluster (admission) | CI / cluster |
-| Scope | Security + Efficiency + Reliability | Pod security only | Whatever you write | API schema only |
-| Built-in rules | ~30 checks | 3 fixed profiles (privileged / baseline / restricted) | None | — |
-| Customization | JSON Schema | None | CEL (very flexible) | — |
-| Extra component | No (in CI) | No, it's native | No, it's native (GA 1.30) | No |
-| Developer feedback | In the PR, with score | On `apply` (late) | On `apply` (late) | In the PR |
+**Show:** table: Polaris CLI, Pod Security Admission, ValidatingAdmissionPolicy, dry-run / kubeconform
 
-> Native = guaranteed and dependency-free, but **happens late** and either covers only security or requires you to write everything.
-> Kyverno / OPA Gatekeeper sit in between: more powerful than Polaris, more complex to operate.
+**Say:**
 
-<!--
-(1:15) LimitRange/ResourceQuota are also native, but they set defaults/caps — they don't validate best practices.
-PSA: namespace label, e.g. pod-security.kubernetes.io/enforce: restricted.
--->
+> Now, Polaris or native tools?
+> Kubernetes has Pod Security Admission. You add a label to the namespace, for example `restricted`.
+> It is simple, but it only checks Pod security.
+> Kubernetes also has ValidatingAdmissionPolicy, with CEL.
+> It is very powerful, but you must write all the rules.
+> Both run in the cluster, so you see the error late, on apply.
+> Polaris runs before, in the PR.
 
----
+**If someone asks:**
 
-## Tradeoffs
-
-**✅ Pros**
-
-- Value on day 1: built-in checks, no policy writing
-- **Real shift-left**: runs without a cluster, feedback in the PR
-- Score enables **gradual** adoption for teams with legacy
-- Covers efficiency and reliability, not just security
-- Same config in CI, webhook and dashboard
-
-**⚠️ Cons**
-
-- **Opinionated**: defaults generate noise (`pullPolicyNotAlways`, `priorityClassNotSet`, `topologySpreadConstraint`) → needs tuning
-- JSON Schema is **less expressive** than CEL/Rego (limited conditional and cross-resource logic)
-- Static analysis **can't see** what mutating webhooks, defaults and runtime values do
-- A CI check can be **bypassed** (direct `kubectl apply`) → admission is needed too
-- Webhook in the cluster = one more component in the critical path (`failurePolicy`)
-- Vendor-maintained project, smaller community than Kyverno/OPA
-
-<!--
-(1:00)
--->
+- PSA label: `pod-security.kubernetes.io/enforce: restricted`
+- ValidatingAdmissionPolicy is GA since Kubernetes 1.30
+- LimitRange and ResourceQuota are native too, but they set defaults and limits. They don't check good practices.
+- Kyverno and OPA Gatekeeper: more powerful than Polaris, but harder to run.
 
 ---
 
-## Recommendation: defense in depth
+## 11. Pros and cons (1:00)
 
-```text
-  PR / CI                     Admission (cluster)               Runtime
-┌──────────────┐          ┌──────────────────────────┐      ┌──────────────┐
-│   Polaris    │  merge → │ Pod Security Admission   │  →   │  Polaris     │
-│   audit      │          │   (restricted)           │      │  Dashboard   │
-│ fast feedback│          │ + ValidatingAdmission-   │      │  drift /     │
-│   + score    │          │   Policy / Kyverno       │      │  legacy      │
-└──────────────┘          └──────────────────────────┘      └──────────────┘
-   "educates"                  "enforces"                     "observes"
-```
+**Show:** two cards, Pros and Cons
 
-- **Polaris in CI** for fast feedback and broad best practices
-- **Native in the cluster** (PSA + VAP) as a safety net that doesn't depend on the pipeline
-- Start with `warning`, measure the score, **tighten gradually**
+**Say:**
 
-<!--
-(0:45) Closing message: Polaris doesn't replace native admission — it makes developers find the problem
-in the PR, instead of on apply or during an incident.
--->
+> First, the good part. Polaris is easy. You get value on day one,
+> and it runs in the PR, with no cluster.
+> Now, the bad part. At first you see many warnings, so you must change the config.
+> JSON Schema is simple, so complex rules are hard.
+> And people can skip CI with kubectl apply.
+> So you still need checks in the cluster.
+
+**If someone asks:** noisy default checks are `pullPolicyNotAlways`, `priorityClassNotSet`
+and `topologySpreadConstraint`. The webhook's `failurePolicy` decides what happens when it is down.
 
 ---
 
-<!-- _class: lead -->
+## 12. Recommendation: use layers (0:45)
 
-# Thank you! 🙋
+**Show:** PR / CI → Admission → Runtime
 
-**Demo in the repo:** `kubernetes-playground/polaris`
+**Say:**
 
-- `examples/bad` → score 35 · `examples/good` → score 100
-- `polaris-config.yaml` → custom checks + exemptions
-- `ci/github-actions-polaris.yaml` → pipeline
+> My recommendation: use layers.
+> Polaris in CI teaches the team, early.
+> Pod Security Admission and ValidatingAdmissionPolicy in the cluster block bad YAML.
+> The Polaris dashboard watches apps that are already running.
+> Polaris does not replace native tools.
+> It helps you find problems in the PR, not in production.
 
-**References**
+---
+
+## 13. Thank you (0:20)
+
+**Say:**
+
+> Thank you! Any questions?
+
+**Links:**
 
 - https://polaris.docs.fairwinds.com
 - https://github.com/FairwindsOps/polaris
 - https://www.cncf.io/blog/2021/07/01/what-is-fairwinds-polaris-kubernetes-open-source-configuration-validation/
 - https://kubernetes.io/docs/concepts/security/pod-security-admission/
 - https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/
-
-<!--
-(0:20) Open for questions.
--->
