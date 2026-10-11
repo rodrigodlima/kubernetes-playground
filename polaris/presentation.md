@@ -7,15 +7,52 @@ title: Polaris - Kubernetes Configuration Validation
 
 # Speaker guide: Polaris
 
-Total time: about 9 and a half minutes (13 slides).
+Total time: about 17 minutes (13 slides, about 9 and a half minutes, plus 5 short demos, about 7 and a half minutes).
+Short on time? Skip the demos after slides 7 and 8 (about 15 and a half minutes).
 
 Each slide below has:
 
 - **Show:** what is on the screen
 - **Say:** a simple script you can read
 - **Time:** how long to stay on the slide
+- **▶ DEMO:** leave the slides, show it live, then come back to the next slide
 
-The slides for the audience are in the Slides artifact. The same script is in the speaker notes there.
+The slides for the audience are in `Polaris Kubernetes Configuration Validation.pptx`.
+The same script is in the speaker notes there, with a `▶ DEMO` line on each slide that has a demo.
+
+## Demo map
+
+| After slide | Where | What | Time |
+|-------------|-------|------|------|
+| 6. Example 1: the result | Terminal + editor | `polaris audit` on `examples/bad` (35) and `examples/good` (100) | 1:30 |
+| 7. Your own rules | Editor + terminal | `customChecks` in `polaris-config.yaml`, audit gives 90 | 1:00 |
+| 8. Exceptions | Editor | `exemptions` in `polaris-config.yaml` | 0:30 |
+| 9. In the pipeline | Editor + Jenkins | `Jenkinsfile`, then build the 3 branches | 3:00 |
+| 10. Polaris vs. native tools | Terminal | Skip Jenkins with `kubectl`: PSA blocks it, but late | 1:30 |
+
+## Before the talk
+
+1. Start the lab (takes a few minutes): `cd lab && ./setup.sh` (Podman: `CONTAINER_ENGINE=podman ./setup.sh`).
+2. Warm up Jenkins with one build, then remove the app, so the audience sees the deploy:
+
+   ```bash
+   ./trigger.sh main
+   KUBECONFIG=.work/kubeconfig-host kubectl delete deploy api -n demo
+   ```
+
+3. Open the windows, in this order (Alt+Tab between them):
+   - **Slides**
+   - **Editor** with `polaris/` open: `examples/bad/deployment.yaml`, `examples/good/deployment.yaml`,
+     `polaris-config.yaml`, `lab/demo-app/Jenkinsfile`
+   - **Terminal** in `polaris/`, with a big font and these two lines already run:
+
+     ```bash
+     export KUBECONFIG=$PWD/lab/.work/kubeconfig-host
+     # Polaris from the container image, no install needed (use podman instead of docker if needed)
+     alias polaris='docker run --rm -v "$PWD":/work:ro,z -w /work quay.io/fairwinds/polaris:10.1 polaris'
+     ```
+
+   - **Browser** with Jenkins logged in: <http://localhost:8080/job/polaris-demo/> (admin / admin)
 
 ---
 
@@ -82,11 +119,7 @@ The slides for the audience are in the Slides artifact. The same script is in th
 > Look at it for a few seconds. How many problems can you see?
 > Let's ask Polaris.
 
-**Command:**
-
-```bash
-polaris audit --audit-path examples/bad --format pretty --only-show-failed-tests
-```
+(No demo yet: first show the result on the next slide.)
 
 ---
 
@@ -105,6 +138,22 @@ polaris audit --audit-path examples/bad --format pretty --only-show-failed-tests
 **The 6 danger checks:** `hostNetworkSet`, `runAsPrivileged`, `runAsRootAllowed`,
 `privilegeEscalationAllowed`, `dangerousCapabilities`, `tagNotSpecified`.
 
+### ▶ DEMO: run it live (1:30) - terminal + editor
+
+```bash
+polaris audit --audit-path examples/bad --format pretty --only-show-failed-tests
+polaris audit --audit-path examples/bad --format score     # 35
+polaris audit --audit-path examples/good --format score    # 100
+```
+
+> Let's see it live. This is the real output, the same as the slide.
+
+Then, in the editor, show `examples/bad/deployment.yaml` and `examples/good/deployment.yaml` side by side:
+
+> On the right, the fixed file: securityContext, resources, probes, the image tag. That's the 100.
+
+Back to the slides.
+
 ---
 
 ## 7. Example 2: your own rules (0:45)
@@ -118,6 +167,19 @@ polaris audit --audit-path examples/bad --format pretty --only-show-failed-tests
 > In the repo, I also have a rule for the team label.
 > The perfect file had 100. With our rules, it has 90.
 > Polaris does not know your company, so you add your rules.
+
+### ▶ DEMO: custom checks (1:00) - editor + terminal
+
+In the editor, open `polaris-config.yaml` and show `customChecks` (`imageRegistry`, `teamLabelMissing`).
+
+```bash
+polaris audit --config polaris-config.yaml --audit-path examples/good --format score     # 90
+polaris audit --config polaris-config.yaml --audit-path examples/good --format pretty --only-show-failed-tests
+```
+
+> The same perfect file. With our rules: 90. The image is not from our registry, and there is no team label.
+
+Back to the slides.
 
 ---
 
@@ -136,6 +198,14 @@ metadata:
 > Some apps must break a rule. For example, kube-proxy and the CNI need hostNetwork.
 > You can add an exception in the config file, or in the YAML file with an annotation.
 > The good part: everyone can see the exception in the PR.
+
+### ▶ DEMO: exemptions (0:30) - editor
+
+Show the `exemptions` block at the end of `polaris-config.yaml` (kube-proxy and cilium in `kube-system`).
+
+> It is just a few lines in the config. Anyone can review it in the PR.
+
+Back to the slides.
 
 ---
 
@@ -158,11 +228,30 @@ metadata:
 
 File in the repo: `lab/demo-app/Jenkinsfile`
 
-------|-----------|
-| `--set-exit-code-on-danger` | 3 |
-| `--set-exit-code-below-score N` | 4 |
+### ▶ DEMO: the pipeline (3:00) - editor + Jenkins
 
-File in the repo: `ci/github-actions-polaris.yaml`
+1. In the editor, open `lab/demo-app/Jenkinsfile`:
+
+   > Two stages. First the Polaris audit, with the two flags. Then the deploy. If the audit fails, there is no deploy.
+
+2. In Jenkins: **Build with Parameters** → `main` (or in the terminal: `lab/trigger.sh main`).
+
+   > This is a good PR. Polaris gives 100. Jenkins deploys it. Look: 3 Pods are running.
+
+   ```bash
+   kubectl get pods -n demo
+   ```
+
+3. Build `feature/insecure`.
+
+   > Now a bad PR. The score is 12. Exit code 3. Jenkins stops, and there is no deploy.
+
+4. Build `feature/untrusted-registry`.
+
+   > Remember the rule from before? This one has a score of 95. Very good, right?
+   > But the image comes from a registry we don't trust. One danger problem is enough. The PR is blocked.
+
+Back to the slides.
 
 ---
 
@@ -186,6 +275,30 @@ File in the repo: `ci/github-actions-polaris.yaml`
 - ValidatingAdmissionPolicy is GA since Kubernetes 1.30
 - LimitRange and ResourceQuota are native too, but they set defaults and limits. They don't check good practices.
 - Kyverno and OPA Gatekeeper: more powerful than Polaris, but harder to run.
+
+### ▶ DEMO: someone skips the pipeline (1:30) - terminal
+
+```bash
+# The namespace has the PSA label
+kubectl get ns demo --show-labels
+
+# A privileged Pod: rejected right away
+kubectl run insecure -n demo --image=nginx:latest --privileged
+
+# An insecure Deployment: accepted with a WARNING, but its Pods are rejected
+sed 's/^  name: api$/  name: api-bypass/; s/app: api$/app: api-bypass/' lab/demo-app/variants/insecure.yaml \
+  | kubectl apply -n demo -f -
+kubectl get rs -n demo -l app=api-bypass          # DESIRED 1, CURRENT 0
+kubectl get events -n demo --field-selector reason=FailedCreate
+```
+
+> What if someone skips Jenkins? Pod Security Admission blocks the Pods in the cluster.
+> But look: the Deployment was created, and the error is only in the events. It is late.
+> This is why we use both: Polaris in the PR, and native tools in the cluster.
+
+After the talk: `kubectl delete deploy api-bypass -n demo`
+
+Back to the slides.
 
 ---
 
@@ -238,27 +351,10 @@ and `topologySpreadConstraint`. The webhook's `failurePolicy` decides what happe
 
 ---
 
-## Live demo (optional, +3 min)
+## After the talk
 
-Run `cd lab && ./setup.sh` **before** the talk. Open Jenkins at http://localhost:8080 (admin / admin).
-Do the demo after slide 9. Full steps: `lab/README.md`.
+```bash
+cd lab && ./teardown.sh     # Podman: CONTAINER_ENGINE=podman ./teardown.sh
+```
 
-1. **Build `main`**
-
-   > This is a good PR. Polaris gives 100. Jenkins deploys it. Look: 3 Pods are running.
-
-2. **Build `feature/insecure`**
-
-   > Now a bad PR. The score is 12. Exit code 3. Jenkins stops, and there is no deploy.
-
-3. **Build `feature/untrusted-registry`**
-
-   > This one has a score of 95. Very good, right? But the image comes from a registry we don't trust.
-   > One danger problem is enough. The PR is blocked.
-
-4. **Skip CI with `kubectl apply`**
-
-   > What if someone skips Jenkins? Pod Security Admission blocks the Pods in the cluster.
-   > But look: the Deployment was created, and the error is only in the events. It is late.
-   > This is why we use both: Polaris in the PR, and native tools in the cluster.
-
+Full lab steps and troubleshooting: `lab/README.md`.
